@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Container,
   Typography,
@@ -22,7 +22,8 @@ import {
   ListItemSecondaryAction,
   IconButton,
   Alert,
-  Snackbar
+  Snackbar,
+  CircularProgress
 } from '@mui/material';
 import {
   Settings as SettingsIcon,
@@ -32,6 +33,8 @@ import {
   Refresh as RefreshIcon,
   Notifications as NotificationsIcon
 } from '@mui/icons-material';
+import AwsCredentialsForm from '../components/AwsCredentialsForm';
+import AWS from 'aws-sdk';
 
 const Settings = () => {
   const [awsRegion, setAwsRegion] = useState('ap-northeast-2');
@@ -42,6 +45,30 @@ const Settings = () => {
   const [slackChannel, setSlackChannel] = useState('#security-alerts');
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [awsCredentials, setAwsCredentials] = useState(null);
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
+  
+  // AWS 자격 증명 로드
+  useEffect(() => {
+    const savedCredentials = localStorage.getItem('awsCredentials');
+    if (savedCredentials) {
+      try {
+        const credentials = JSON.parse(savedCredentials);
+        setAwsCredentials({
+          ...credentials,
+          connectedAt: localStorage.getItem('awsCredentialsConnectedAt') || new Date().toLocaleString()
+        });
+      } catch (error) {
+        console.error('자격 증명 로드 오류:', error);
+      }
+    }
+  }, []);
+
+  // Access Key 마스킹 함수
+  const maskAccessKey = (key) => {
+    if (!key) return '';
+    return key.substring(0, 4) + '...' + key.substring(key.length - 4);
+  };
   
   // 샘플 데이터
   const connectedAccounts = [
@@ -65,14 +92,59 @@ const Settings = () => {
     setSnackbarOpen(true);
   };
 
-  const handleDeleteAccount = (accountId) => {
-    // 계정 삭제 로직 구현
-    console.log(`Delete account: ${accountId}`);
+  const handleAwsCredentialsSave = (credentials) => {
+    // 현재 시간 저장
+    const connectedAt = new Date().toLocaleString();
+    localStorage.setItem('awsCredentialsConnectedAt', connectedAt);
+    
+    // 자격 증명 상태 업데이트
+    setAwsCredentials({
+      ...credentials,
+      connectedAt
+    });
+    
+    setSnackbarMessage('AWS 계정이 연결되었습니다.');
+    setSnackbarOpen(true);
   };
 
-  const handleRefreshAccount = (accountId) => {
-    // 계정 새로고침 로직 구현
-    console.log(`Refresh account: ${accountId}`);
+  const handleDisconnectAws = () => {
+    // AWS 자격 증명 삭제
+    localStorage.removeItem('awsCredentials');
+    localStorage.removeItem('awsCredentialsConnectedAt');
+    setAwsCredentials(null);
+    
+    setSnackbarMessage('AWS 계정 연결이 해제되었습니다.');
+    setSnackbarOpen(true);
+  };
+
+  const handleTestConnection = async () => {
+    try {
+      setIsTestingConnection(true);
+      
+      const savedCredentials = localStorage.getItem('awsCredentials');
+      if (!savedCredentials) {
+        throw new Error('저장된 AWS 자격 증명이 없습니다.');
+      }
+      
+      const credentials = JSON.parse(savedCredentials);
+      
+      AWS.config.update({
+        accessKeyId: credentials.accessKeyId,
+        secretAccessKey: credentials.secretAccessKey,
+        region: credentials.region
+      });
+      
+      const sts = new AWS.STS();
+      const response = await sts.getCallerIdentity().promise();
+      
+      setSnackbarMessage(`AWS 연결 테스트 성공! 계정 ID: ${response.Account}`);
+      setSnackbarOpen(true);
+    } catch (error) {
+      setSnackbarMessage(`AWS 연결 테스트 실패: ${error.message}`);
+      setSnackbarOpen(true);
+    } finally {
+      setIsTestingConnection(false);
+    }
   };
 
   const handleSaveSlackSettings = () => {
@@ -199,53 +271,47 @@ const Settings = () => {
             </Box>
             <Divider sx={{ mb: 3 }} />
             
-            <List>
-              {connectedAccounts.map((account) => (
-                <Card key={account.id} variant="outlined" sx={{ mb: 2 }}>
-                  <CardContent>
-                    <Typography variant="subtitle1" fontWeight="bold">
-                      {account.name}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                      계정 ID: {account.id}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                      IAM 역할: {account.role}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      마지막 스캔: {account.lastScan}
-                    </Typography>
-                    
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
-                      <IconButton 
-                        size="small" 
-                        color="primary"
-                        onClick={() => handleRefreshAccount(account.id)}
-                      >
-                        <RefreshIcon />
-                      </IconButton>
-                      <IconButton 
-                        size="small" 
-                        color="error"
-                        onClick={() => handleDeleteAccount(account.id)}
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </Box>
-                  </CardContent>
-                </Card>
-              ))}
-            </List>
-            
-            <Button 
-              variant="contained" 
-              color="primary" 
-              startIcon={<AddIcon />}
-              fullWidth
-              sx={{ mt: 2 }}
-            >
-              AWS 계정 추가
-            </Button>
+            {awsCredentials ? (
+              <Box>
+                <Alert severity="success" sx={{ mb: 2 }}>
+                  AWS 계정이 연결되었습니다.
+                </Alert>
+                <Typography variant="subtitle1" fontWeight="bold">
+                  연결된 계정 정보
+                </Typography>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  Access Key ID: {maskAccessKey(awsCredentials.accessKeyId)}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  리전: {awsCredentials.region}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  연결 시간: {awsCredentials.connectedAt}
+                </Typography>
+                
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
+                  <Button 
+                    variant="outlined" 
+                    color="primary"
+                    startIcon={isTestingConnection ? <CircularProgress size={20} /> : <RefreshIcon />}
+                    onClick={handleTestConnection}
+                    disabled={isTestingConnection}
+                  >
+                    {isTestingConnection ? '테스트 중...' : '연결 테스트'}
+                  </Button>
+                  <Button 
+                    variant="outlined" 
+                    color="error"
+                    startIcon={<DeleteIcon />}
+                    onClick={handleDisconnectAws}
+                  >
+                    연결 해제
+                  </Button>
+                </Box>
+              </Box>
+            ) : (
+              <AwsCredentialsForm onSave={handleAwsCredentialsSave} />
+            )}
           </Paper>
         </Grid>
         

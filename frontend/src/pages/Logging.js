@@ -1,397 +1,182 @@
 import React from 'react';
 import {
-  Container,
+  Box,
   Typography,
   Paper,
-  Box,
   Grid,
   Card,
   CardContent,
-  Divider,
+  LinearProgress,
+  Chip,
+  Alert,
+  CircularProgress,
   List,
   ListItem,
-  ListItemIcon,
-  ListItemText,
-  Chip,
-  Button
+  ListItemText
 } from '@mui/material';
 import {
-  Assessment as AssessmentIcon,
   CheckCircle as CheckCircleIcon,
-  Warning as WarningIcon,
-  Error as ErrorIcon,
-  Visibility as VisibilityIcon
+  Error as ErrorIcon
 } from '@mui/icons-material';
-import StatusSummary from '../components/StatusSummary';
+import { useIsms } from '../contexts/IsmsContext';
 
 const Logging = () => {
-  // 상태 요약을 위한 데이터
-  const statusCategories = [
-    { name: 'CloudTrail', compliant: 2, total: 3 },
-    { name: 'CloudWatch 알람', compliant: 10, total: 12 },
-    { name: 'AWS Config', compliant: 11, total: 15 },
-    { name: '로그 보존', compliant: 3, total: 4 },
-    { name: '이벤트 모니터링', compliant: 4, total: 5 }
-  ];
-  // 샘플 데이터
-  const cloudTrailStatus = {
-    enabled: true,
-    multiRegion: false,
-    logFileValidation: true,
-    s3BucketName: 'isms-cloudtrail-logs',
-    issues: ['일부 리전에서 CloudTrail이 활성화되지 않음']
-  };
-
-  const cloudWatchStatus = {
-    alarms: 12,
-    activeAlarms: 2,
-    dashboards: 5,
-    issues: []
-  };
-
-  const configStatus = {
-    enabled: true,
-    recorders: 3,
-    rules: 15,
-    nonCompliantRules: 4,
-    issues: ['일부 리소스 유형이 기록되지 않음']
-  };
-
-  const recentEvents = [
-    {
-      eventName: 'ConsoleLogin',
-      eventTime: '2023-06-15T14:30:45Z',
-      sourceIPAddress: '192.168.1.1',
-      userIdentity: 'admin',
-      status: 'ok'
-    },
-    {
-      eventName: 'CreateSecurityGroup',
-      eventTime: '2023-06-15T13:22:10Z',
-      sourceIPAddress: '192.168.1.1',
-      userIdentity: 'admin',
-      status: 'ok'
-    },
-    {
-      eventName: 'AuthorizeSecurityGroupIngress',
-      eventTime: '2023-06-15T13:25:30Z',
-      sourceIPAddress: '192.168.1.1',
-      userIdentity: 'admin',
-      status: 'medium'
-    },
-    {
-      eventName: 'DeleteRolePolicy',
-      eventTime: '2023-06-14T09:12:05Z',
-      sourceIPAddress: '192.168.1.100',
-      userIdentity: 'developer',
-      status: 'high'
-    },
-    {
-      eventName: 'StopInstances',
-      eventTime: '2023-06-14T08:45:22Z',
-      sourceIPAddress: '192.168.1.100',
-      userIdentity: 'developer',
-      status: 'ok'
-    }
-  ];
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'high':
-        return <ErrorIcon color="error" />;
-      case 'medium':
-        return <WarningIcon color="warning" />;
-      case 'ok':
-        return <CheckCircleIcon color="success" />;
-      default:
-        return <CheckCircleIcon color="success" />;
-    }
-  };
-
-  const getStatusChip = (status) => {
-    let color = 'success';
-    let label = '양호';
-
-    switch (status) {
-      case 'high':
-        color = 'error';
-        label = '심각';
-        break;
-      case 'medium':
-        color = 'warning';
-        label = '주의';
-        break;
-      default:
-        color = 'success';
-        label = '양호';
-    }
-
-    return <Chip size="small" color={color} label={label} />;
-  };
+  const { ismsData, loading, error } = useIsms();
+  
+  // 로딩 중이면 로딩 표시
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+  
+  // ISMS 2.9 시스템 및 서비스 운영관리 데이터 추출
+  const operationData = ismsData?.isms_mapping?.['2.9'] || { items: [] };
+  const sectionSummary = ismsData?.compliance_summary?.section_summary?.['2.9'] || { total: 0, compliant: 0, percentage: 0 };
+  const compliancePercentage = Math.round(sectionSummary.percentage || 0);
 
   return (
-    <Container maxWidth="lg">
-      <Typography variant="h4" component="h1" gutterBottom>
-        로깅 및 모니터링
-      </Typography>
-      <Typography variant="body1" color="text.secondary" paragraph>
-        AWS 환경의 로깅 및 모니터링 설정을 검토하고 ISMS 요구사항에 맞게 관리합니다.
-      </Typography>
+    <Box>
+      <Typography variant="h4" gutterBottom>로깅 및 모니터링</Typography>
       
-      {/* 상태 요약 카드 */}
-      <StatusSummary categories={statusCategories} />
-
-      <Grid container spacing={3}>
-        {/* CloudTrail 상태 */}
-        <Grid item xs={12} md={4}>
-          <Paper elevation={2} sx={{ p: 3, height: '100%' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <AssessmentIcon color="primary" sx={{ mr: 1 }} />
-              <Typography variant="h6">CloudTrail</Typography>
-            </Box>
-            <Divider sx={{ mb: 2 }} />
-            
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="body1">상태</Typography>
-              {cloudTrailStatus.enabled ? 
-                <Chip size="small" color="success" label="활성화됨" /> : 
-                <Chip size="small" color="error" label="비활성화됨" />
-              }
-            </Box>
-            
-            <List dense>
-              <ListItem disablePadding>
-                <ListItemIcon sx={{ minWidth: 30 }}>
-                  {cloudTrailStatus.multiRegion ? 
-                    <CheckCircleIcon color="success" /> : 
-                    <WarningIcon color="warning" />
-                  }
-                </ListItemIcon>
-                <ListItemText 
-                  primary="다중 리전 추적" 
-                  secondary={cloudTrailStatus.multiRegion ? "활성화됨" : "비활성화됨"} 
-                />
-              </ListItem>
-              
-              <ListItem disablePadding>
-                <ListItemIcon sx={{ minWidth: 30 }}>
-                  {cloudTrailStatus.logFileValidation ? 
-                    <CheckCircleIcon color="success" /> : 
-                    <WarningIcon color="warning" />
-                  }
-                </ListItemIcon>
-                <ListItemText 
-                  primary="로그 파일 검증" 
-                  secondary={cloudTrailStatus.logFileValidation ? "활성화됨" : "비활성화됨"} 
-                />
-              </ListItem>
-              
-              <ListItem disablePadding>
-                <ListItemIcon sx={{ minWidth: 30 }}>
-                  <CheckCircleIcon color="success" />
-                </ListItemIcon>
-                <ListItemText 
-                  primary="S3 버킷" 
-                  secondary={cloudTrailStatus.s3BucketName} 
-                />
-              </ListItem>
-            </List>
-            
-            {cloudTrailStatus.issues.length > 0 && (
-              <Box sx={{ mt: 2 }}>
-                <Typography variant="body2" color="error.main">
-                  발견된 문제:
-                </Typography>
-                <List dense disablePadding>
-                  {cloudTrailStatus.issues.map((issue, index) => (
-                    <ListItem key={index} disablePadding>
-                      <ListItemIcon sx={{ minWidth: 30 }}>
-                        <WarningIcon color="warning" />
-                      </ListItemIcon>
-                      <ListItemText primary={issue} />
-                    </ListItem>
-                  ))}
-                </List>
-              </Box>
-            )}
-          </Paper>
-        </Grid>
+      {/* ISMS 준수 상태 요약 */}
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Typography variant="h6">ISMS 준수 상태</Typography>
         
-        {/* CloudWatch 상태 */}
-        <Grid item xs={12} md={4}>
-          <Paper elevation={2} sx={{ p: 3, height: '100%' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <AssessmentIcon color="primary" sx={{ mr: 1 }} />
-              <Typography variant="h6">CloudWatch</Typography>
-            </Box>
-            <Divider sx={{ mb: 2 }} />
-            
-            <List dense>
-              <ListItem disablePadding>
-                <ListItemIcon sx={{ minWidth: 30 }}>
-                  <CheckCircleIcon color="success" />
-                </ListItemIcon>
-                <ListItemText 
-                  primary="알람" 
-                  secondary={`총 ${cloudWatchStatus.alarms}개 (활성 ${cloudWatchStatus.activeAlarms}개)`} 
-                />
-              </ListItem>
-              
-              <ListItem disablePadding>
-                <ListItemIcon sx={{ minWidth: 30 }}>
-                  <CheckCircleIcon color="success" />
-                </ListItemIcon>
-                <ListItemText 
-                  primary="대시보드" 
-                  secondary={`${cloudWatchStatus.dashboards}개`} 
-                />
-              </ListItem>
-            </List>
-            
-            {cloudWatchStatus.issues.length > 0 && (
-              <Box sx={{ mt: 2 }}>
-                <Typography variant="body2" color="error.main">
-                  발견된 문제:
-                </Typography>
-                <List dense disablePadding>
-                  {cloudWatchStatus.issues.map((issue, index) => (
-                    <ListItem key={index} disablePadding>
-                      <ListItemIcon sx={{ minWidth: 30 }}>
-                        <WarningIcon color="warning" />
-                      </ListItemIcon>
-                      <ListItemText primary={issue} />
-                    </ListItem>
-                  ))}
-                </List>
+        {!ismsData ? (
+          <Alert severity="info" sx={{ mt: 2 }}>
+            ISMS 데이터가 없습니다. ISMS 대시보드에서 AWS 계정 스캔을 실행해주세요.
+          </Alert>
+        ) : (
+          <Box sx={{ display: 'flex', alignItems: 'center', mt: 2 }}>
+            <Box sx={{ flexGrow: 1, mr: 2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                <Typography variant="body2">준수율</Typography>
+                <Typography variant="body2" fontWeight={600}>{compliancePercentage}%</Typography>
               </Box>
-            )}
-            
-            <Button 
-              variant="outlined" 
-              size="small" 
-              sx={{ mt: 2 }}
-              startIcon={<VisibilityIcon />}
-            >
-              대시보드 보기
-            </Button>
-          </Paper>
-        </Grid>
-        
-        {/* Config 상태 */}
-        <Grid item xs={12} md={4}>
-          <Paper elevation={2} sx={{ p: 3, height: '100%' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <AssessmentIcon color="primary" sx={{ mr: 1 }} />
-              <Typography variant="h6">AWS Config</Typography>
+              <LinearProgress 
+                variant="determinate" 
+                value={compliancePercentage} 
+                sx={{ height: 8, borderRadius: 4 }} 
+              />
             </Box>
-            <Divider sx={{ mb: 2 }} />
-            
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="body1">상태</Typography>
-              {configStatus.enabled ? 
-                <Chip size="small" color="success" label="활성화됨" /> : 
-                <Chip size="small" color="error" label="비활성화됨" />
-              }
-            </Box>
-            
-            <List dense>
-              <ListItem disablePadding>
-                <ListItemIcon sx={{ minWidth: 30 }}>
-                  <CheckCircleIcon color="success" />
-                </ListItemIcon>
-                <ListItemText 
-                  primary="설정 레코더" 
-                  secondary={`${configStatus.recorders}개`} 
-                />
-              </ListItem>
-              
-              <ListItem disablePadding>
-                <ListItemIcon sx={{ minWidth: 30 }}>
-                  {configStatus.nonCompliantRules > 0 ? 
-                    <WarningIcon color="warning" /> : 
-                    <CheckCircleIcon color="success" />
-                  }
-                </ListItemIcon>
-                <ListItemText 
-                  primary="규칙" 
-                  secondary={`총 ${configStatus.rules}개 (미준수 ${configStatus.nonCompliantRules}개)`} 
-                />
-              </ListItem>
-            </List>
-            
-            {configStatus.issues.length > 0 && (
-              <Box sx={{ mt: 2 }}>
-                <Typography variant="body2" color="error.main">
-                  발견된 문제:
-                </Typography>
-                <List dense disablePadding>
-                  {configStatus.issues.map((issue, index) => (
-                    <ListItem key={index} disablePadding>
-                      <ListItemIcon sx={{ minWidth: 30 }}>
-                        <WarningIcon color="warning" />
-                      </ListItemIcon>
-                      <ListItemText primary={issue} />
-                    </ListItem>
-                  ))}
-                </List>
-              </Box>
-            )}
-            
-            <Button 
-              variant="outlined" 
-              size="small" 
-              sx={{ mt: 2 }}
-              startIcon={<VisibilityIcon />}
-            >
-              규칙 보기
-            </Button>
-          </Paper>
-        </Grid>
-        
-        {/* 최근 이벤트 */}
-        <Grid item xs={12}>
-          <Paper elevation={2} sx={{ p: 3 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <AssessmentIcon color="primary" sx={{ mr: 1 }} />
-              <Typography variant="h6">최근 이벤트</Typography>
-            </Box>
-            <Divider sx={{ mb: 2 }} />
-            
-            <Grid container spacing={2}>
-              {recentEvents.map((event, index) => (
-                <Grid item xs={12} key={index}>
-                  <Card variant="outlined">
-                    <CardContent>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Box>
-                          <Typography variant="subtitle1" fontWeight="bold">
-                            {event.eventName}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            {new Date(event.eventTime).toLocaleString()} | {event.userIdentity} | {event.sourceIPAddress}
-                          </Typography>
-                        </Box>
-                        {getStatusChip(event.status)}
-                      </Box>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ))}
+            <Chip 
+              label={compliancePercentage >= 80 ? "양호" : "개선 필요"} 
+              color={compliancePercentage >= 80 ? "success" : "warning"}
+            />
+          </Box>
+        )}
+      </Paper>
+      
+      {/* ISMS 항목 목록 */}
+      {ismsData && (
+        <Grid container spacing={3}>
+          {operationData.items.map((item) => (
+            <Grid item xs={12} md={6} key={item.id}>
+              <Card>
+                <CardContent>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                    <Typography variant="h6">{item.name}</Typography>
+                    <Chip 
+                      icon={item.compliant ? <CheckCircleIcon /> : <ErrorIcon />}
+                      label={item.compliant ? "준수" : "미준수"} 
+                      color={item.compliant ? "success" : "error"}
+                    />
+                  </Box>
+                  <Typography variant="body2" color="text.secondary">
+                    {item.id} - {item.name} 관련 보안 설정 상태
+                  </Typography>
+                  
+                  {/* 항목별 세부 정보 */}
+                  {item.id === '2.9.1' && (
+                    <Box sx={{ mt: 2 }}>
+                      <Typography variant="subtitle2">로그 관리 상태</Typography>
+                      
+                      {/* CloudTrail 설정 */}
+                      {item.details?.cloudtrail?.length > 0 ? (
+                        <List dense>
+                          {item.details.cloudtrail.map((trail, index) => (
+                            <ListItem key={index}>
+                              <ListItemText 
+                                primary={trail.trail_name}
+                                secondary={
+                                  <>
+                                    다중 리전: {trail.is_multi_region ? '예' : '아니오'}, 
+                                    로깅 활성화: {trail.is_logging ? '예' : '아니오'}, 
+                                    로그 파일 검증: {trail.log_file_validation_enabled ? '활성화' : '비활성화'}
+                                  </>
+                                }
+                              />
+                            </ListItem>
+                          ))}
+                        </List>
+                      ) : (
+                        <Typography variant="body2" color="error.main">
+                          CloudTrail이 구성되지 않았습니다.
+                        </Typography>
+                      )}
+                    </Box>
+                  )}
+                  
+                  {item.id === '2.9.2' && (
+                    <Box sx={{ mt: 2 }}>
+                      <Typography variant="subtitle2">보안 모니터링 상태</Typography>
+                      
+                      {/* 보안 경보 */}
+                      {item.details?.security_alarms?.length > 0 ? (
+                        <List dense>
+                          {item.details.security_alarms.map((alarm, index) => (
+                            <ListItem key={index}>
+                              <ListItemText 
+                                primary={alarm.alarm_name}
+                                secondary={`지표: ${alarm.metric_name}`}
+                              />
+                            </ListItem>
+                          ))}
+                        </List>
+                      ) : (
+                        <Typography variant="body2" color="error.main">
+                          보안 관련 CloudWatch 경보가 구성되지 않았습니다.
+                        </Typography>
+                      )}
+                    </Box>
+                  )}
+                </CardContent>
+              </Card>
             </Grid>
-            
-            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-              <Button 
-                variant="contained" 
-                color="primary"
-                startIcon={<VisibilityIcon />}
-              >
-                모든 이벤트 보기
-              </Button>
-            </Box>
-          </Paper>
+          ))}
         </Grid>
-      </Grid>
-    </Container>
+      )}
+      
+      {/* 기존 로깅 및 모니터링 컨텐츠 */}
+      <Box sx={{ mt: 4 }}>
+        <Typography variant="h5" gutterBottom>로깅 및 모니터링 도구</Typography>
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={6}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6">CloudTrail 관리</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  AWS API 호출 로그 수집, 저장 및 분석을 관리합니다.
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6">CloudWatch 경보</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  보안 관련 지표 모니터링 및 경보 설정을 관리합니다.
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      </Box>
+    </Box>
   );
 };
 

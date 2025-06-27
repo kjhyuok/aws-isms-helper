@@ -29,37 +29,119 @@ import {
   ExitToApp as ExitToAppIcon,
   Storage as StorageIcon,
   Notifications as NotificationsIcon,
-  Search as SearchIcon
+  Search as SearchIcon,
+  VerifiedUser as VerifiedUserIcon,
+  Lock as LockIcon,
+  EnhancedEncryption as EnhancedEncryptionIcon,
+  Computer as ComputerIcon,
+  Shield as ShieldIcon,
+  QuestionAnswer as QuestionAnswerIcon,
+  Description as DescriptionIcon,
+  Chat as ChatIcon,
+  Visibility as VisibilityIcon
 } from '@mui/icons-material';
 import { AccountCircle as AccountCircleIcon, NetworkCheck as NetworkCheckIcon } from '@mui/icons-material';
+import { useIsms } from '../contexts/IsmsContext';
 
 const drawerWidth = 260;
-
-const menuSections = [
-  {
-    title: '보안 관리',
-    items: [
-      { text: '대시보드', icon: <DashboardIcon />, path: '/' },
-      { text: '계정 및 접근 관리', icon: <AccountCircleIcon />, path: '/account-management' },
-      { text: '네트워크 보안', icon: <NetworkCheckIcon />, path: '/network-security' },
-      { text: '데이터 보호', icon: <StorageIcon />, path: '/data-protection' },
-      { text: '로깅 및 모니터링', icon: <AssessmentIcon />, path: '/logging' },
-    ],
-  },
-  {
-    title: '보고서 및 설정',
-    items: [
-      { text: '보고서', icon: <AssessmentIcon />, path: '/reports' },
-      { text: '설정', icon: <SettingsIcon />, path: '/settings' },
-    ],
-  },
-];
 
 function Layout({ children, user, signOut }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
+  const { ismsData } = useIsms();
+
+  // ISMS 데이터에서 각 보안 영역의 준수 상태 계산
+  const getComplianceStatus = (category) => {
+    if (!ismsData || !ismsData.isms_mapping) return null;
+    
+    // 카테고리별 매핑 (사이드바 메뉴와 ISMS 항목 연결)
+    const categoryMapping = {
+      'account': ['2.5'], // 계정 및 접근관리 -> 2.5 인증 및 권한관리
+      'network': ['2.6'], // 네트워크 보안 -> 2.6 접근통제
+      'data': ['2.7'],    // 데이터 보호 -> 2.7 암호화 적용
+      'logging': ['2.9']  // 로깅 및 모니터링 -> 2.9 시스템 및 서비스 운영관리
+    };
+    
+    const relevantSections = categoryMapping[category] || [];
+    if (relevantSections.length === 0) return null;
+    
+    // 관련 섹션의 준수율 계산
+    let totalItems = 0;
+    let compliantItems = 0;
+    
+    relevantSections.forEach(section => {
+      const sectionData = ismsData.isms_mapping[section];
+      if (sectionData && sectionData.items) {
+        totalItems += sectionData.items.length;
+        compliantItems += sectionData.items.filter(item => item.compliant).length;
+      }
+    });
+    
+    if (totalItems === 0) return null;
+    
+    const complianceRate = (compliantItems / totalItems) * 100;
+    return {
+      rate: complianceRate,
+      status: complianceRate >= 80 ? 'compliant' : complianceRate >= 50 ? 'partial' : 'non-compliant'
+    };
+  };
+
+  const menuSections = [
+    {
+      title: 'ISMS 관리',
+      items: [
+        { text: 'ISMS 대시보드', icon: <SecurityIcon />, path: '/isms-dashboard' },
+        { text: 'ISMS 통제항목', icon: <ShieldIcon />, path: '/isms-controls' },
+      ],
+    },
+    {
+      title: 'ISMS 지원 도구',
+      items: [
+        { text: '모의 인터뷰', icon: <QuestionAnswerIcon />, path: '/mock-interview' },
+        { text: '보고서 만들기', icon: <DescriptionIcon />, path: '/report-generator' },
+        { text: 'ISMS-AIChat', icon: <ChatIcon />, path: '/isms-ai-chat' },
+      ],
+    },
+    {
+      title: '보안 관리',
+      items: [
+        { text: '대시보드', icon: <DashboardIcon />, path: '/' },
+        { 
+          text: '계정 및 접근 관리', 
+          icon: <AccountCircleIcon />, 
+          path: '/account-management',
+          compliance: getComplianceStatus('account')
+        },
+        { 
+          text: '네트워크 보안', 
+          icon: <NetworkCheckIcon />, 
+          path: '/network-security',
+          compliance: getComplianceStatus('network')
+        },
+        { 
+          text: '데이터 보호', 
+          icon: <StorageIcon />, 
+          path: '/data-protection',
+          compliance: getComplianceStatus('data')
+        },
+        { 
+          text: '로깅 및 모니터링', 
+          icon: <VisibilityIcon />, 
+          path: '/logging',
+          compliance: getComplianceStatus('logging')
+        },
+      ],
+    },
+    {
+      title: '보고서 및 설정',
+      items: [
+        { text: '보고서', icon: <AssessmentIcon />, path: '/reports' },
+        { text: '설정', icon: <SettingsIcon />, path: '/settings' },
+      ],
+    },
+  ];
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -161,6 +243,23 @@ function Layout({ children, user, signOut }) {
                           fontWeight: isSelected ? 600 : 500
                         }}
                       />
+                      
+                      {/* 준수 상태 표시 */}
+                      {item.compliance && (
+                        <Box 
+                          sx={{ 
+                            width: 10, 
+                            height: 10, 
+                            borderRadius: '50%', 
+                            bgcolor: item.compliance.status === 'compliant' 
+                              ? theme.palette.success.main 
+                              : item.compliance.status === 'partial' 
+                                ? theme.palette.warning.main 
+                                : theme.palette.error.main,
+                            ml: 1
+                          }} 
+                        />
+                      )}
                     </ListItemButton>
                   </ListItem>
                 );
@@ -224,24 +323,6 @@ function Layout({ children, user, signOut }) {
           >
             <MenuIcon />
           </IconButton>
-          
-          {/* 검색 영역 */}
-          <Box 
-            sx={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              bgcolor: alpha(theme.palette.common.black, 0.04),
-              borderRadius: 2,
-              px: 2,
-              py: 0.5,
-              mr: 2,
-              flexGrow: { xs: 1, md: 0 },
-              width: { md: 300 }
-            }}
-          >
-            <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />
-            <Typography variant="body2" color="text.secondary">검색...</Typography>
-          </Box>
           
           <Box sx={{ flexGrow: 1 }} />
 
